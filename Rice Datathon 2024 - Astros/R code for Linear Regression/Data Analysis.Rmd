@@ -1,0 +1,93 @@
+---
+title: "Data Analysis/Regression"
+author: "Anthony Hu"
+date: "2024-01-21"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#
+```{r}
+library(stats)
+library(glmnet)
+```
+
+```{r}
+data <- read.csv("datathon_2024_dataset_model.csv")[,-c(2, 3, 5:8)]
+
+# Linear Regression
+mod_linear <- lm(run_diff~as.factor(is_day_game_x)+single_diff+double_diff+triple_diff+hr_diff+pa_diff+
+                   free_base_diff+home_k+away_k+field_diff+days_since_last_home_game+days_since_last_away_game+
+                   home_distance+away_distance, data = data)
+summary(mod_linear)
+# Testing for normality of residuals
+qqnorm(mod_linear$residuals)
+qqline(mod_linear$residuals)
+
+plot(density(mod_linear$residuals), main = "Density of Residuals")
+
+# Linear Regression, but drop all variables with insignificant p-values
+mod_linear_2 <- lm(run_diff~single_diff+double_diff+triple_diff+hr_diff+pa_diff+free_base_diff++ home_k+away_k+
+                     field_diff+days_since_last_home_game, data = data)
+summary(mod_linear_2)
+# Testing for normality of residuals
+qqnorm(mod_linear_2$residuals)
+qqline(mod_linear_2$residuals)
+
+plot(density(mod_linear_2$residuals), main = "Density of Residuals")
+```
+
+
+```{r}
+data2 <- data
+data2$hit_diff <- data2$single_diff + data2$double_diff + data2$triple_diff + data2$hr_diff
+data2$k_diff <- data2$home_k - data2$away_k
+data2$travel_sum <- data2$home_distance + data2$away_distance
+
+mod_linear_3 <- lm(run_diff ~hit_diff + free_base_diff + pa_diff+k_diff+
+                     field_diff + days_since_last_home_game + 
+                     I(hit_diff* travel_sum) +
+                     I(k_diff * travel_sum) + 
+                     I(free_base_diff * travel_sum) +
+                     I(field_diff * travel_sum) + days_since_last_away_game+
+                   home_distance+away_distance
+                   ,data2)
+
+summary(mod_linear_3)
+
+qqnorm(mod_linear_3$residuals)
+qqline(mod_linear_3$residuals)
+```
+
+
+
+```{r}
+# LASSO Regression
+data_reg <- data[,-1]
+X <- scale(as.matrix(data_reg[,-2]), center = TRUE, scale = TRUE)
+Y <- scale(as.matrix(data_reg[,2]), center = TRUE, scale = TRUE)
+
+LASSO_cv <- cv.glmnet(X, Y, family = "gaussian", 
+                      type.measure = "mse")
+
+opt_Lambda <- LASSO_cv$lambda.min
+plot(LASSO_cv$glmnet.fit, "norm", label = TRUE)
+plot(LASSO_cv$glmnet.fit, "lambda", label = TRUE)
+
+
+LASSO_mod <- glmnet(X, Y, family = "gaussian", 
+                      type.measure = "mse")
+plot(LASSO_mod)
+LASSO_coef <- predict(LASSO_mod, type = "coefficients", s = opt_Lambda)
+LASSO_coef
+
+LASSO_pred <- predict(LASSO_mod,X, type = "response", s = opt_Lambda)
+LASSO_MSE <- mean((LASSO_pred - Y) ^ 2)
+qqnorm(LASSO_pred - Y)
+qqline(LASSO_pred - Y)
+```
