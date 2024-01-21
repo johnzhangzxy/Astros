@@ -1,3 +1,3 @@
 Astros Project
 
-Group Member: Anthony Hu, Jieming Luan, Xiaoyu John
+Group Member: Anthony Hu, Jieming Luan, Xiaoyu John Zhang
